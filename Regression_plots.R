@@ -20,7 +20,7 @@ suppressMessages(require(gtools))
 args = commandArgs(trailingOnly=TRUE)
 myquery1 = args[1]
 myquery2 = args[2]
-myquery4 = args[3]
+myquery3 = args[3]
 myquery4 = args[4]
 
 #The SMART query is in CSV format, so parse the
