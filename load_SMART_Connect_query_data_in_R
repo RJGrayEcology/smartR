@@ -1,0 +1,87 @@
+library(tidyverse)
+library(rvest)
+library(RSelenium) # needs java and under the current script, mozilla firefox browser
+library(janitor)
+library(parallel)
+
+#type your info
+your.server="" # the server address
+your.user.name="" # your connect user name
+your.password="" # your connect password
+your.query="" # the query you would like to run
+
+#open the browser
+rd <-RSelenium::rsDriver(browser=c("firefox"), chromever = NULL ) # can work with chrome but needs extra information
+
+# Assign the client to an object
+remDr <- rd[["client"]]
+
+# use it of the browser closes due to inactivity
+remDr$open()
+
+#go to the server
+remDr$navigate(your.server)
+
+#let it load
+Sys.sleep(5)
+
+#add username
+webElem <- remDr$findElement(using = "name", value = "j_username") 
+webElem$sendKeysToElement(list(your.user.name)) #type the search keywords
+
+#add password
+webElem <- remDr$findElement(using = "name", value = "j_password")  
+webElem$sendKeysToElement(list(your.password))#type the search keywords
+
+#click login
+webElem <- remDr$findElement(using = "class", value = "button") 
+webElem$clickElement()
+
+#let it login
+Sys.sleep(5)
+
+#select "queries"
+webElem <- remDr$findElements(using = "class", value = "menuitem") # go to the search of posts
+webElem[[6]]$clickElement()
+
+#click all queries
+webElem <- remDr$findElements(using = "class", value = "folder-label") # go to "all queries"
+webElem[[length(webElem)]]$clickElement() #click all queries
+
+#select desired query
+html.code <- remDr$getPageSource()[[1]] # code of the website
+query.names=read_html(html.code) %>%
+  html_nodes("div[id=querytable]") %>%
+  html_children() %>% html_attrs()
+query.names=sapply(query.names, function(x) x["data-queryname"])
+index.query.name=grep(your.query, query.names)
+
+#run the query
+webElem <- remDr$findElements(using = "class", value = "run-icon")
+webElem[[index.query.name-1]]$clickElement() #click all queries
+
+#get the shareable link with the output
+webElem <- remDr$findElement(using = 'xpath', "//*/a[@title = 'Get a direct link for this query']")
+webElem$clickElement()
+
+# copy the shareable link
+temp.link <- remDr$findElement(using = 'xpath', value = './/*[@id="urllink"]')
+temp.link=temp.link$getElementAttribute("value")[[1]]
+
+# go to the shareable link
+remDr$navigate(temp.link)
+
+#let it load
+Sys.sleep(4)
+
+#get the code of the data and process it
+data.in.text <- remDr$getPageSource()[[1]] %>% read_html() %>%
+  html_nodes("pre") %>%
+  html_text2()
+data<-read.csv(text = data.in.text, sep = ",")
+data <- data %>%  clean_names() # lower case and a single character
+
+head(data)
+
+remDr$quit()
+remDr$closeServer()
